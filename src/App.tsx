@@ -1,5 +1,5 @@
 import {Button, Container, Grid} from '@mui/material'
-import React, {useState} from 'react'
+import React, {useEffect, useState} from 'react'
 import {loadModel} from './helpers'
 import {ReactSketchCanvasRef} from "react-sketch-canvas/dist/ReactSketchCanvas";
 import {Canvas} from "./Canvas";
@@ -8,6 +8,29 @@ import * as tf from '@tensorflow/tfjs-core';
 import {svgToPngBase64, makeBlobFromBase64} from "svg-to-png-browser"; //function is async
 import '@tensorflow/tfjs-backend-webgl';
 
+
+export const convert = (path: string) => {
+    const coordinates = path.split('C');
+
+    let xMax = 0, yMax = 0, xMin = Number.MAX_VALUE, yMin = Number.MAX_VALUE;
+
+    for (let coordinate of coordinates) {
+        const coordinateArray = coordinate.split(' ');
+        let [x, y] = coordinateArray[1].split(',');
+        if (!x || !y) {
+            continue;
+        }
+
+        const X = parseInt(x.split('.')[0], 10);
+        const Y = parseInt(y.split('.')[0], 10);
+        xMax = Math.max(xMax, X);
+        yMax = Math.max(yMax, Y);
+        xMin = Math.min(xMin, X);
+        yMin = Math.min(yMin, Y);
+
+    }
+    return `M ${xMin},${yMin} H ${xMax} V ${yMax} H ${xMin} V ${yMin}`
+}
 
 
 function App() {
@@ -52,8 +75,44 @@ function App() {
             console.log({e})
         }
     };
-
     const [shape, setShape] = useState('');
+
+    useEffect(() => {
+        if (shape !== 'square') return;
+        const node = document.getElementById('react-sketch-canvas__stroke-group-0');
+        if (!node) return;
+        const lastElement = node.lastElementChild;
+        if (!lastElement) return;
+
+        //        <animate xlink:href="#react-sketch-canvas__0"
+        //                  attributeName="d"
+        //                  attributeType="XML"
+        //                  to="M 60,34 H 272 V 268 H 60 V 34"
+        //                  dur="1s"
+        //                  fill="freeze"
+        //                     repeatCount="indefinite" />
+        const newAnimate = document.createElementNS('http://www.w3.org/2000/svg', 'animate');
+        newAnimate.setAttribute('xlink:href', '#react-sketch-canvas__0');
+        newAnimate.setAttribute('attributeName', 'd');
+        newAnimate.setAttribute('attributeType', 'XML');
+        newAnimate.setAttribute('to', convert(lastElement.getAttribute('d') || ''));
+        newAnimate.setAttribute('dur', '1s');
+        newAnimate.setAttribute('fill', 'freeze');
+        newAnimate.setAttribute('repeatCount', 'indefinite');
+        node.appendChild(newAnimate);
+
+        // const newPath = document.createElement("path");
+        // newPath.setAttribute('d', convert(lastElement.getAttribute('d') as string));
+        // newPath.setAttribute('fill', "none");
+        // newPath.setAttribute('stroke-linecap', "round");
+        // newPath.setAttribute('fill', "none");
+        // newPath.setAttribute('stroke', "red");
+        // newPath.setAttribute('stroke-width', "4");
+
+        // console.log('newPath', newPath)
+        // node.append(newPath);
+    }, [shape])
+
 
     const resize = async (pngUrl: string): Promise<HTMLCanvasElement> => {
         return new Promise<HTMLCanvasElement>((resolve) => {
